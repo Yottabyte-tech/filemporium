@@ -1,23 +1,16 @@
 import { useState } from 'react';
-import './App.css'; // Assuming you have an App.css file
+import './App.css';
 
 function Submit() {
-  // State for the input URL
   const [url, setUrl] = useState('');
-  // State for the API response
   const [scrapedData, setScrapedData] = useState(null);
-  // State for managing loading status
   const [loading, setLoading] = useState(false);
-  // State for managing potential errors
   const [error, setError] = useState(null);
 
-  // NOTE: Replace with your actual API key.
-  // DO NOT USE THIS IN PRODUCTION. Use a backend proxy instead.
-  const apiKey = 'YOUR_API_KEY'; 
+  // Replace this with your actual Render service URL
+  const renderApiUrl = 'https://filemporium-1.onrender.com';
 
-  // Function to handle the API call
   const handleScrape = async () => {
-    // Basic validation to ensure the input is not empty
     if (!url) {
       setError('Please enter a URL.');
       return;
@@ -28,22 +21,21 @@ function Submit() {
     setScrapedData(null);
 
     try {
-      const response = await fetch(
-        `https://api.api-ninjas.com/v1/webscraper?url=${encodeURIComponent(url)}`,
-        {
-          method: 'GET',
-          headers: {
-            'X-Api-Key': 'r4iUVXpDwrR3+flKX9KaMQ==mC5sYEcYc9nSMcIE',
-          },
-        }
-      );
+      const response = await fetch(`${renderApiUrl}/scrape`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: url }), // Send the URL in the request body
+      });
 
       if (!response.ok) {
         throw new Error(`Error: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      setScrapedData(data.data); // Assuming the response has a 'data' property
+      // Assuming your server returns an object with a `data` property
+      setScrapedData(data.data); 
     } catch (err) {
       setError(err.message);
     } finally {
@@ -54,7 +46,7 @@ function Submit() {
   return (
     <>
       <div className="card">
-        <h1>API Ninjas Web Scraper</h1>
+        <h1>Render Web Scraper</h1>
         <div className="input-group">
           <input
             type="url"
