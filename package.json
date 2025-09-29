@@ -11,7 +11,8 @@
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "push": "git add . && git commit -m \"Commit\" && git push && npm run deploy",
-    "start-scraper": "node server.js"
+    "start-scraper": "node server.js",
+    "postinstall": "npx puppeteer install"
   },
   "dependencies": {
     "react": "^18.2.0",
