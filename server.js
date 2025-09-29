@@ -1,35 +1,50 @@
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+// server.js
+import express from 'express';
+import cors from 'cors';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
 puppeteer.use(StealthPlugin());
 
-const targetUrl = 'https://example-cloudflare-protected.com';
-const residentialProxies = ['http://user:pass@proxy1.com', 'http://user:pass@proxy2.com'];
+const app = express();
+const port = process.env.PORT || 3001;
 
-async function scrapeWithProxy(url) {
-  const proxy = residentialProxies[Math.floor(Math.random() * residentialProxies.length)];
+app.use(cors());
+app.use(express.json());
+
+// Define the scraping logic as a function
+async function scrapeWebsite(targetUrl) {
   let browser;
-
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: [`--proxy-server=${proxy}`],
-    });
-
+    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'networkidle2' });
-    
-    // Check for Cloudflare challenge elements and handle them.
-    // The stealth plugin and headless browser will handle most JavaScript checks automatically.
-    
-    // Your scraping logic here...
+    await page.goto(targetUrl, { waitUntil: 'networkidle2' });
     const content = await page.content();
-    console.log(content);
-
+    return content;
   } catch (error) {
     console.error('Scraping failed:', error);
+    throw error;
   } finally {
     if (browser) await browser.close();
   }
 }
 
-scrapeWithProxy(targetUrl);
+// Create the API endpoint for scraping
+app.post('/scrape', async (req, res) => {
+  const { url } = req.body;
+
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required' });
+  }
+
+  try {
+    const scrapedContent = await scrapeWebsite(url);
+    res.json({ data: scrapedContent });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to scrape the website.' });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
+});
