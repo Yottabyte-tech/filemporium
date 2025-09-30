@@ -8,7 +8,7 @@ function Submit() {
   const [error, setError] = useState(null);
   // 1
   // Replace this with your actual Render service URL
-  const renderApiUrl = 'https://filemporium-1.onrender.com';
+  const renderApiUrl = 'https://filemporium-1.onrender.com/';
 
   const handleScrape = async () => {
     if (!url) {
