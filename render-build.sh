@@ -11,7 +11,7 @@ export PUPPETEER_CACHE_DIR=/opt/render/.cache/puppeteer
 mkdir -p $PUPPETEER_CACHE_DIR
 
 # Install the correct browser version for Puppeteer
-npx puppeteer browsers install chrome
+npx @puppeteer/browsers install chrome@127.0.6533.88
 
 # Store/pull Puppeteer cache with build cache
 if [[ ! -d $PUPPETEER_CACHE_DIR ]]; then
