@@ -3,16 +3,17 @@ import './App.css';
 
 function Submit() {
   const [url, setUrl] = useState('');
+  const [elementType, setElementType] = useState(''); // State for element type
   const [scrapedData, setScrapedData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  // 1
+
   // Replace this with your actual Render service URL
-  const renderApiUrl = 'https://filemporium-1.onrender.com/';
+  const renderApiUrl = 'https://filemporium-1.onrender.com';
 
   const handleScrape = async () => {
-    if (!url) {
-      setError('Please enter a URL.');
+    if (!url || !elementType) {
+      setError('Please enter both a URL and an Element Type.');
       return;
     }
 
@@ -26,7 +27,7 @@ function Submit() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: url }), // Send the URL in the request body
+        body: JSON.stringify({ url: url, elementType: elementType }), // Send both URL and elementType
       });
 
       if (!response.ok) {
@@ -34,25 +35,32 @@ function Submit() {
       }
 
       const data = await response.json();
-      // Assuming your server returns an object with a `data` property
-      setScrapedData(data.data); 
+      setScrapedData(data.data);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   };
-  
+
   return (
     <>
       <div className="card">
         <h1>Render Web Scraper</h1>
         <div className="input-group">
+          {/* Input field for the URL */}
           <input
             type="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="Enter a URL to scrape"
+          />
+          {/* New input field for the element Type*/}
+          <input
+            type="text"
+            value={elementType}
+            onChange={(e) => setElementType(e.target.value)}
+            placeholder="Enter the element type (e.g., 'img')"
           />
           <button onClick={handleScrape} disabled={loading}>
             {loading ? 'Scraping...' : 'Scrape'}
