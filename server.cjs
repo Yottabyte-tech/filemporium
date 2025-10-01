@@ -25,7 +25,7 @@ async function scrapeImages(url) {
     // Set a larger viewport to ensure images are loaded
     await page.setViewport({ width: 1920, height: 1080 });
 
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 45000 }); // Increased timeout
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 }); // Increased timeout
 
     // Wait specifically for the content container to appear, for robustness
     await page.waitForSelector('.thing-content', { timeout: 15000 });

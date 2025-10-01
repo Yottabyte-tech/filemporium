@@ -8,10 +8,8 @@ function Submit() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // **IMPORTANT: Your specific Render service URL**
-  // This is the correct configuration. The frontend calls YOUR server,
-  // and YOUR server performs the scraping.
-  const renderApiUrl = 'https://filemporium-1.onrender.com/';
+  // **IMPORTANT: Removed the trailing slash here.**
+  const renderApiUrl = 'https://filemporium-1.onrender.com';
 
   const handleScrape = async () => {
     if (!url) {
@@ -22,17 +20,15 @@ function Submit() {
     setError(null);
     setScrapedData(null);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
-      // The frontend sends a request to your Node.js backend.
-      // The backend then handles the scraping logic.
       const response = await fetch(`${renderApiUrl}/scrape`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: url }), // Your backend handles the scraping logic
+        body: JSON.stringify({ url: url }),
         signal: controller.signal,
       });
 
@@ -43,11 +39,11 @@ function Submit() {
       }
 
       const data = await response.json();
-      setScrapedData(data.data); // Expect an array of URLs here
+      setScrapedData(data.data);
     } catch (err) {
       clearTimeout(timeoutId);
       if (err.name === 'AbortError') {
-        setError('Server timed out after 20 seconds. Please try again.');
+        setError('Server timed out after 60 seconds. Please try again.');
       } else {
         setError(err.message);
       }
