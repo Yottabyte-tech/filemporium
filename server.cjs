@@ -30,7 +30,7 @@
     }
 
     // Example usage
-    const targetUrl = 'https://example.com'; // Replace with your target URL
+    const targetUrl = 'https://www.thingiverse.com/thing:7160083'; // Replace with your target URL
     scrapeImages(targetUrl).then(images => {
         console.log('Found images:', images);
     });
