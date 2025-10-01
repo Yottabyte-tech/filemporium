@@ -1,4 +1,15 @@
-// ... (previous imports and setup)
+import express from 'express';
+import cors from 'cors';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
+puppeteer.use(StealthPlugin());
+
+const app = express(); // <-- This line must be at the top
+const port = process.env.PORT || 3001;
+
+app.use(cors());
+app.use(express.json());
 
 async function scrapeWebsite(targetUrl) {
   let browser;
@@ -43,6 +54,7 @@ async function scrapeWebsite(targetUrl) {
   }
 }
 
+// Define the API endpoint for scraping
 app.post('/scrape', async (req, res) => {
   const { url } = req.body;
 
@@ -58,4 +70,6 @@ app.post('/scrape', async (req, res) => {
   }
 });
 
-// ... (rest of the server code)
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
+});
