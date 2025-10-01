@@ -3,17 +3,15 @@ import './App.css';
 
 function Submit() {
   const [url, setUrl] = useState('');
-  const [elementType, setElementType] = useState(''); // State for element type
-  const [scrapedData, setScrapedData] = useState(null);
+  const [scrapedData, setScrapedData] = useState(null); // Will now be an array of strings
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Replace this with your actual Render service URL
   const renderApiUrl = 'https://filemporium-1.onrender.com';
 
   const handleScrape = async () => {
-    if (!url || !elementType) {
-      setError('Please enter both a URL and an Element Type.');
+    if (!url) {
+      setError('Please enter a URL.');
       return;
     }
 
@@ -21,23 +19,34 @@ function Submit() {
     setError(null);
     setScrapedData(null);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
     try {
       const response = await fetch(`${renderApiUrl}/scrape`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: url, elementType: elementType }), // Send both URL and elementType
+        body: JSON.stringify({ url: url }), // Only send the URL now
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Error: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
-      setScrapedData(data.data);
+      setScrapedData(data.data); // Expect an array of URLs here
     } catch (err) {
-      setError(err.message);
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        setError('Server timed out after 20 seconds. Please try again.');
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -48,19 +57,11 @@ function Submit() {
       <div className="card">
         <h1>Render Web Scraper</h1>
         <div className="input-group">
-          {/* Input field for the URL */}
           <input
             type="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="Enter a URL to scrape"
-          />
-          {/* New input field for the element Type*/}
-          <input
-            type="text"
-            value={elementType}
-            onChange={(e) => setElementType(e.target.value)}
-            placeholder="Enter the element type (e.g., 'img')"
           />
           <button onClick={handleScrape} disabled={loading}>
             {loading ? 'Scraping...' : 'Scrape'}
@@ -69,8 +70,16 @@ function Submit() {
         {error && <p className="error">{error}</p>}
         {scrapedData && (
           <div className="result-container">
-            <h3>Scraped Content</h3>
-            <pre>{scrapedData}</pre>
+            <h3>Scraped Image URLs</h3>
+            <ul>
+              {scrapedData.map((imageUrl, index) => (
+                <li key={index}>
+                  <a href={imageUrl} target="_blank" rel="noopener noreferrer">
+                    {imageUrl}
+                  </a>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

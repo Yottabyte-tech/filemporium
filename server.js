@@ -1,41 +1,42 @@
-import express from 'express';
-import cors from 'cors';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+// ... (previous imports and setup)
 
-puppeteer.use(StealthPlugin());
-
-const app = express();
-const port = process.env.PORT || 3001;
-
-app.use(cors());
-app.use(express.json());
-
-async function scrapeWebsite(targetUrl, elementType) {
+async function scrapeWebsite(targetUrl) {
   let browser;
   try {
-    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage'
+      ],
+      timeout: 60000 // Increased timeout for browser launch
+    });
     const page = await browser.newPage();
 
     // Block unnecessary resources for faster page loading
     await page.setRequestInterception(true);
     page.on('request', (request) => {
-      if (['image', 'stylesheet', 'font'].includes(request.resourceType())) {
+      // Allow image requests, but block others like stylesheets and fonts
+      if (['stylesheet', 'font'].includes(request.resourceType())) {
         request.abort();
       } else {
         request.continue();
       }
     });
 
-    // Wait only for the DOM content to be loaded, not all network activity
     await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // Use page.$eval to select the first element with the specified tag and return its innerHTML
-    const elementContent = await page.$eval(elementType, element => element.innerHTML);
+    // Use page.$$eval to get an array of all image src attributes
+    const imageUrls = await page.$$eval('img', (images) => {
+      // Ensure the return is an array, mapping over the images to get their 'src'
+      return images.map(img => img.src);
+    });
 
-    return elementContent;
+    return imageUrls; // Return the array of image URLs
+
   } catch (error) {
-    console.error(`Scraping failed for element with type '${elementType}':`, error);
+    console.error(`Scraping failed:`, error);
     throw error;
   } finally {
     if (browser) await browser.close();
@@ -43,20 +44,18 @@ async function scrapeWebsite(targetUrl, elementType) {
 }
 
 app.post('/scrape', async (req, res) => {
-  const { url, elementType } = req.body;
+  const { url } = req.body;
 
-  if (!url || !elementType) {
-    return res.status(400).json({ error: 'URL and elementType are required in the request body.' });
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required in the request body.' });
   }
 
   try {
-    const scrapedContent = await scrapeWebsite(url, elementType);
+    const scrapedContent = await scrapeWebsite(url);
     res.json({ data: scrapedContent });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to scrape the specified component.' });
+    res.status(500).json({ error: 'Failed to scrape the specified website.' });
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-});
+// ... (rest of the server code)
