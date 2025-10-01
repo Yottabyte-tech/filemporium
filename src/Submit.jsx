@@ -7,6 +7,7 @@ function Submit() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // This should be your actual Render service URL, e.g., 'https://your-service-name.onrender.com'
   const renderApiUrl = 'https://filemporium-1.onrender.com';
 
   const handleScrape = async () => {
@@ -61,7 +62,7 @@ function Submit() {
             type="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="Enter a URL to scrape"
+            placeholder="Enter a Thingiverse URL"
           />
           <button onClick={handleScrape} disabled={loading}>
             {loading ? 'Scraping...' : 'Scrape'}
