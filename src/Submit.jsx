@@ -1,13 +1,16 @@
+// Import necessary modules for your React component
 import { useState } from 'react';
 import './App.css';
 
 function Submit() {
   const [url, setUrl] = useState('');
-  const [scrapedData, setScrapedData] = useState(null); // Will now be an array of strings
+  const [scrapedData, setScrapedData] = useState(null); // This will hold the array of strings
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // This should be your actual Render service URL, e.g., 'https://your-service-name.onrender.com'
+  // **IMPORTANT: Your specific Render service URL**
+  // This is the correct configuration. The frontend calls YOUR server,
+  // and YOUR server performs the scraping.
   const renderApiUrl = 'https://filemporium-1.onrender.com';
 
   const handleScrape = async () => {
@@ -15,21 +18,21 @@ function Submit() {
       setError('Please enter a URL.');
       return;
     }
-
     setLoading(true);
     setError(null);
     setScrapedData(null);
-
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     try {
+      // The frontend sends a request to your Node.js backend.
+      // The backend then handles the scraping logic.
       const response = await fetch(`${renderApiUrl}/scrape`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url: url }), // Only send the URL now
+        body: JSON.stringify({ url: url }), // Your backend handles the scraping logic
         signal: controller.signal,
       });
 
