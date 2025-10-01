@@ -19,7 +19,8 @@ async function scrapeWebsite(targetUrl) {
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage'
+        '--disable-dev-shm-usage',
+        '--no-zygote' // <-- This is the key change for the launch timeout error
       ],
       timeout: 60000 // Increased browser launch timeout
     });
