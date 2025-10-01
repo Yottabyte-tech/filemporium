@@ -5,13 +5,11 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
 puppeteer.use(StealthPlugin());
 
-const app = express(); // <-- This line must be at the top
+const app = express();
 const port = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
-
-// ... (imports and setup)
 
 async function scrapeWebsite(targetUrl) {
   let browser;
@@ -23,14 +21,14 @@ async function scrapeWebsite(targetUrl) {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage'
       ],
-      timeout: 60000 // Increased timeout for browser launch
+      timeout: 60000
     });
     const page = await browser.newPage();
 
     // Block unnecessary resources for faster page loading
     await page.setRequestInterception(true);
     page.on('request', (request) => {
-      // Allow image requests but block stylesheets and fonts
+      // Allow image requests, but block stylesheets and fonts
       if (['stylesheet', 'font'].includes(request.resourceType())) {
         request.abort();
       } else {
@@ -38,51 +36,58 @@ async function scrapeWebsite(targetUrl) {
       }
     });
 
-    // Wait for the main document and initial images to appear
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForSelector('img', { timeout: 15000 }); // Wait up to 15 seconds for an image tag
+    try {
+      // Use Promise.race() for more reliable navigation and element waiting
+      await Promise.race([
+        page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }),
+        page.waitForSelector('img', { timeout: 15000 })
+      ]);
+    } catch (e) {
+      console.log("Navigation or initial image load timed out, proceeding anyway.");
+    }
 
-    // Scroll to the bottom to trigger lazy loading
-    await page.evaluate(async () => {
-      await new Promise((resolve) => {
-        let totalHeight = 0;
-        const distance = 100;
-        const timer = setInterval(() => {
-          const scrollHeight = document.body.scrollHeight;
-          window.scrollBy(0, distance);
-          totalHeight += distance;
-
-          if (totalHeight >= scrollHeight) {
-            clearInterval(timer);
-            resolve();
-          }
-        }, 100);
+    // Scroll to the bottom to trigger lazy loading, with a timeout
+    try {
+      await page.evaluate(async () => {
+        await new Promise((resolve) => {
+          const MAX_SCROLL_TIME = 10000; // 10-second max scroll
+          const start = Date.now();
+          let prevScrollHeight = document.body.scrollHeight;
+          let scrollInterval = setInterval(() => {
+            window.scrollBy(0, 500); // Scroll down
+            const newScrollHeight = document.body.scrollHeight;
+            if (Date.now() - start > MAX_SCROLL_TIME || newScrollHeight === prevScrollHeight) {
+              clearInterval(scrollInterval);
+              resolve();
+            }
+            prevScrollHeight = newScrollHeight;
+          }, 200); // Scroll every 200ms
+        });
       });
-    });
+    } catch (e) {
+      console.log("Scrolling failed or timed out.");
+    }
 
-    // Extract image URLs and filter out the favicon
+    // Extract image URLs and filter out favicons or tiny placeholders
     const imageUrls = await page.$$eval('img', (images) => {
-      // Get all src attributes
-      const allSrcs = images.map(img => img.src);
+      const allSrcs = images.map(img => img.src).filter(url => url && !url.startsWith('data:'));
 
-      // Filter out invalid or small images that are likely favicons
-      return allSrcs.filter(url => {
-        // Exclude empty strings, data URIs, or tiny placeholder images
-        if (!url || url.startsWith('data:')) {
-          return false;
-        }
-
-        // Exclude common favicon filenames, but this is less reliable
-        if (url.includes('favicon')) {
-          return false;
-        }
-
-        // Return the URL if it appears to be a legitimate image
-        return true;
-      });
+      return allSrcs.filter(url => !url.includes('favicon'));
     });
 
-    return imageUrls;
+    // Handle potential duplicate URLs from lazy loading and relative paths
+    const uniqueImageUrls = [...new Set(imageUrls)];
+    const absoluteImageUrls = uniqueImageUrls.map(url => {
+        if (url.startsWith('http')) {
+            return url;
+        } else {
+            // This is a basic way to handle relative URLs. For complex sites, you might need more logic.
+            const baseUrl = new URL(targetUrl);
+            return new URL(url, baseUrl).href;
+        }
+    });
+
+    return absoluteImageUrls;
 
   } catch (error) {
     console.error(`Scraping failed:`, error);
@@ -92,10 +97,6 @@ async function scrapeWebsite(targetUrl) {
   }
 }
 
-// ... (rest of the server code)
-
-
-// Define the API endpoint for scraping
 app.post('/scrape', async (req, res) => {
   const { url } = req.body;
 
