@@ -1,17 +1,19 @@
 // server.cjs
 const express = require('express');
-const axios = require('axios');
+const cors = require('cors');
 const cheerio = require('cheerio');
-const puppeteer = require('puppeteer'); // Use puppeteer for dynamic sites like Thingiverse
+const puppeteer = require('puppeteer');
 
-// Create the Express app
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT; // Use the port assigned by Render
+
+// Enable CORS for all origins
+app.use(cors());
 
 // Middleware to parse JSON bodies
 app.use(express.json());
 
-// Scrape function (updated to use Puppeteer for dynamic content)
+// Scrape function (unchanged)
 async function scrapeImages(url) {
   try {
     const browser = await puppeteer.launch({
@@ -21,10 +23,8 @@ async function scrapeImages(url) {
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
     const content = await page.content();
     await browser.close();
-
     const $ = cheerio.load(content);
     const imageUrls = [];
-    // Adjust selectors based on inspecting a Thingiverse page
     $('img').each((i, element) => {
       let src = $(element).attr('src') || $(element).attr('data-src');
       if (src && (src.startsWith('http') || src.startsWith('https'))) {
@@ -44,7 +44,6 @@ app.post('/scrape', async (req, res) => {
   if (!url) {
     return res.status(400).json({ error: 'URL is required.' });
   }
-
   try {
     const scrapedData = await scrapeImages(url);
     res.json({ data: scrapedData });
@@ -58,4 +57,3 @@ app.post('/scrape', async (req, res) => {
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
 });
-

@@ -11,7 +11,7 @@ function Submit() {
   // **IMPORTANT: Your specific Render service URL**
   // This is the correct configuration. The frontend calls YOUR server,
   // and YOUR server performs the scraping.
-  const renderApiUrl = 'https://filemporium-1.onrender.com';
+  const renderApiUrl = 'https://filemporium-1.onrender.com/';
 
   const handleScrape = async () => {
     if (!url) {
