@@ -1,36 +1,61 @@
-    const axios = require('axios');
-    const cheerio = require('cheerio');
+// server.cjs
+const express = require('express');
+const axios = require('axios');
+const cheerio = require('cheerio');
+const puppeteer = require('puppeteer'); // Use puppeteer for dynamic sites like Thingiverse
 
-    async function scrapeImages(url) {
-        try {
-            const { data } = await axios.get(url);
-            const $ = cheerio.load(data);
-            const imageUrls = [];
+// Create the Express app
+const app = express();
+const port = process.env.PORT || 3000;
 
-            $('img').each((i, element) => {
-                const src = $(element).attr('src');
-                if (src) {
-                    // Handle relative URLs if necessary
-                    if (src.startsWith('http')) {
-                        imageUrls.push(src);
-                    } else {
-                        // You might need to construct the full URL
-                        // based on the base URL of the page
-                        const baseUrl = new URL(url).origin;
-                        imageUrls.push(`${baseUrl}${src}`);
-                    }
-                }
-            });
+// Middleware to parse JSON bodies
+app.use(express.json());
 
-            return imageUrls;
-        } catch (error) {
-            console.error(`Error scraping images from ${url}:`, error);
-            return [];
-        }
-    }
-
-    // Example usage
-    const targetUrl = 'https://www.thingiverse.com/thing:7160083'; // Replace with your target URL
-    scrapeImages(targetUrl).then(images => {
-        console.log('Found images:', images);
+// Scrape function (updated to use Puppeteer for dynamic content)
+async function scrapeImages(url) {
+  try {
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
+    const page = await browser.newPage();
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+    const content = await page.content();
+    await browser.close();
+
+    const $ = cheerio.load(content);
+    const imageUrls = [];
+    // Adjust selectors based on inspecting a Thingiverse page
+    $('img').each((i, element) => {
+      let src = $(element).attr('src') || $(element).attr('data-src');
+      if (src && (src.startsWith('http') || src.startsWith('https'))) {
+        imageUrls.push(src);
+      }
+    });
+    return imageUrls;
+  } catch (error) {
+    console.error(`Error scraping images from ${url}:`, error);
+    return [];
+  }
+}
+
+// Define the /scrape endpoint
+app.post('/scrape', async (req, res) => {
+  const { url } = req.body;
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required.' });
+  }
+
+  try {
+    const scrapedData = await scrapeImages(url);
+    res.json({ data: scrapedData });
+  } catch (error) {
+    console.error('Scraping error:', error);
+    res.status(500).json({ error: 'Failed to scrape URL.' });
+  }
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
+});
+
