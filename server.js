@@ -21,7 +21,7 @@ async function scrapeWebsite(targetUrl) {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage'
       ],
-      timeout: 60000
+      timeout: 60000 // Increased timeout for browser launch
     });
     const page = await browser.newPage();
 
@@ -37,31 +37,32 @@ async function scrapeWebsite(targetUrl) {
     });
 
     try {
-      // Use Promise.race() for more reliable navigation and element waiting
-      await Promise.race([
-        page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }),
-        page.waitForSelector('img', { timeout: 15000 })
-      ]);
+      // Wait for the main document to load and network activity to settle.
+      await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 45000 });
+      
+      // Wait for the main image gallery or first images to load.
+      // Adjust this selector if it doesn't work for the specific pages you are targeting.
+      await page.waitForSelector('img.gallery-image', { timeout: 20000 }); 
     } catch (e) {
-      console.log("Navigation or initial image load timed out, proceeding anyway.");
+      console.log("Navigation or specific image selector timed out, proceeding anyway. This might be a sign of a problem.", e);
     }
 
     // Scroll to the bottom to trigger lazy loading, with a timeout
     try {
       await page.evaluate(async () => {
         await new Promise((resolve) => {
-          const MAX_SCROLL_TIME = 10000; // 10-second max scroll
+          const MAX_SCROLL_TIME = 10000;
           const start = Date.now();
           let prevScrollHeight = document.body.scrollHeight;
-          let scrollInterval = setInterval(() => {
-            window.scrollBy(0, 500); // Scroll down
+          const scrollInterval = setInterval(() => {
+            window.scrollBy(0, 500);
             const newScrollHeight = document.body.scrollHeight;
             if (Date.now() - start > MAX_SCROLL_TIME || newScrollHeight === prevScrollHeight) {
               clearInterval(scrollInterval);
               resolve();
             }
             prevScrollHeight = newScrollHeight;
-          }, 200); // Scroll every 200ms
+          }, 200);
         });
       });
     } catch (e) {
@@ -69,25 +70,24 @@ async function scrapeWebsite(targetUrl) {
     }
 
     // Extract image URLs and filter out favicons or tiny placeholders
-    const imageUrls = await page.$$eval('img', (images) => {
+    const imageUrls = await page.$$eval('img', (images, targetUrl) => {
       const allSrcs = images.map(img => img.src).filter(url => url && !url.startsWith('data:'));
+      
+      const baseUrl = new URL(targetUrl);
+      const absoluteImageUrls = allSrcs.map(url => {
+          try {
+              return new URL(url, baseUrl).href;
+          } catch (e) {
+              return null; // Handle malformed URLs gracefully
+          }
+      }).filter(url => url !== null);
+      
+      const uniqueAbsoluteImageUrls = [...new Set(absoluteImageUrls)];
 
-      return allSrcs.filter(url => !url.includes('favicon'));
-    });
+      return uniqueAbsoluteImageUrls.filter(url => !url.includes('favicon'));
+    }, targetUrl);
 
-    // Handle potential duplicate URLs from lazy loading and relative paths
-    const uniqueImageUrls = [...new Set(imageUrls)];
-    const absoluteImageUrls = uniqueImageUrls.map(url => {
-        if (url.startsWith('http')) {
-            return url;
-        } else {
-            // This is a basic way to handle relative URLs. For complex sites, you might need more logic.
-            const baseUrl = new URL(targetUrl);
-            return new URL(url, baseUrl).href;
-        }
-    });
-
-    return absoluteImageUrls;
+    return imageUrls;
 
   } catch (error) {
     console.error(`Scraping failed:`, error);
