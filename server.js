@@ -21,14 +21,14 @@ async function scrapeWebsite(targetUrl) {
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage'
       ],
-      timeout: 60000 // Increased timeout for browser launch
+      timeout: 60000 // Increased browser launch timeout
     });
     const page = await browser.newPage();
 
     // Block unnecessary resources for faster page loading
     await page.setRequestInterception(true);
     page.on('request', (request) => {
-      // Allow image requests, but block stylesheets and fonts
+      // Allow image requests but block stylesheets and fonts
       if (['stylesheet', 'font'].includes(request.resourceType())) {
         request.abort();
       } else {
@@ -37,23 +37,23 @@ async function scrapeWebsite(targetUrl) {
     });
 
     try {
-      // Wait for the main document to load and network activity to settle.
-      await page.goto(targetUrl, { waitUntil: 'networkidle0', timeout: 45000 });
+      // Use 'domcontentloaded' for initial load, but allow time for images to appear
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
       
-      // Wait for the main image gallery or first images to load.
-      // Adjust this selector if it doesn't work for the specific pages you are targeting.
+      // Wait for a specific, representative image selector to appear
+      // 'img.gallery-image' is a good guess for Thingiverse. Adjust if needed.
       await page.waitForSelector('img.gallery-image', { timeout: 20000 }); 
     } catch (e) {
-      console.log("Navigation or specific image selector timed out, proceeding anyway. This might be a sign of a problem.", e);
+      console.log("Navigation or image selector timed out, proceeding anyway.");
     }
 
     // Scroll to the bottom to trigger lazy loading, with a timeout
     try {
       await page.evaluate(async () => {
         await new Promise((resolve) => {
-          const MAX_SCROLL_TIME = 10000;
+          const MAX_SCROLL_TIME = 15000; // Increased max scroll time
           const start = Date.now();
-          let prevScrollHeight = document.body.scrollHeight;
+          let prevScrollHeight = -1;
           const scrollInterval = setInterval(() => {
             window.scrollBy(0, 500);
             const newScrollHeight = document.body.scrollHeight;
@@ -62,7 +62,7 @@ async function scrapeWebsite(targetUrl) {
               resolve();
             }
             prevScrollHeight = newScrollHeight;
-          }, 200);
+          }, 300); // Slower scroll interval to give images time to load
         });
       });
     } catch (e) {
@@ -78,13 +78,13 @@ async function scrapeWebsite(targetUrl) {
           try {
               return new URL(url, baseUrl).href;
           } catch (e) {
-              return null; // Handle malformed URLs gracefully
+              return null;
           }
       }).filter(url => url !== null);
       
       const uniqueAbsoluteImageUrls = [...new Set(absoluteImageUrls)];
 
-      return uniqueAbsoluteImageUrls.filter(url => !url.includes('favicon'));
+      return uniqueAbsoluteImageUrls.filter(url => !url.includes('favicon') && !url.includes('svg'));
     }, targetUrl);
 
     return imageUrls;
