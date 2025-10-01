@@ -11,14 +11,24 @@ const port = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// Update the scraping logic to find the element by its type (tag name)
 async function scrapeWebsite(targetUrl, elementType) {
   let browser;
   try {
     browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] });
     const page = await browser.newPage();
 
-    await page.goto(targetUrl, { waitUntil: 'networkidle2' });
+    // Block unnecessary resources for faster page loading
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      if (['image', 'stylesheet', 'font'].includes(request.resourceType())) {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    // Wait only for the DOM content to be loaded, not all network activity
+    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // Use page.$eval to select the first element with the specified tag and return its innerHTML
     const elementContent = await page.$eval(elementType, element => element.innerHTML);
@@ -32,7 +42,6 @@ async function scrapeWebsite(targetUrl, elementType) {
   }
 }
 
-// Update the API endpoint to handle the new request body
 app.post('/scrape', async (req, res) => {
   const { url, elementType } = req.body;
 
