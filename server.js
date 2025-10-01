@@ -11,6 +11,8 @@ const port = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// ... (imports and setup)
+
 async function scrapeWebsite(targetUrl) {
   let browser;
   try {
@@ -28,7 +30,7 @@ async function scrapeWebsite(targetUrl) {
     // Block unnecessary resources for faster page loading
     await page.setRequestInterception(true);
     page.on('request', (request) => {
-      // Allow image requests, but block others like stylesheets and fonts
+      // Allow image requests but block stylesheets and fonts
       if (['stylesheet', 'font'].includes(request.resourceType())) {
         request.abort();
       } else {
@@ -36,15 +38,51 @@ async function scrapeWebsite(targetUrl) {
       }
     });
 
+    // Wait for the main document and initial images to appear
     await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForSelector('img', { timeout: 15000 }); // Wait up to 15 seconds for an image tag
 
-    // Use page.$$eval to get an array of all image src attributes
-    const imageUrls = await page.$$eval('img', (images) => {
-      // Ensure the return is an array, mapping over the images to get their 'src'
-      return images.map(img => img.src);
+    // Scroll to the bottom to trigger lazy loading
+    await page.evaluate(async () => {
+      await new Promise((resolve) => {
+        let totalHeight = 0;
+        const distance = 100;
+        const timer = setInterval(() => {
+          const scrollHeight = document.body.scrollHeight;
+          window.scrollBy(0, distance);
+          totalHeight += distance;
+
+          if (totalHeight >= scrollHeight) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 100);
+      });
     });
 
-    return imageUrls; // Return the array of image URLs
+    // Extract image URLs and filter out the favicon
+    const imageUrls = await page.$$eval('img', (images) => {
+      // Get all src attributes
+      const allSrcs = images.map(img => img.src);
+
+      // Filter out invalid or small images that are likely favicons
+      return allSrcs.filter(url => {
+        // Exclude empty strings, data URIs, or tiny placeholder images
+        if (!url || url.startsWith('data:')) {
+          return false;
+        }
+
+        // Exclude common favicon filenames, but this is less reliable
+        if (url.includes('favicon')) {
+          return false;
+        }
+
+        // Return the URL if it appears to be a legitimate image
+        return true;
+      });
+    });
+
+    return imageUrls;
 
   } catch (error) {
     console.error(`Scraping failed:`, error);
@@ -53,6 +91,9 @@ async function scrapeWebsite(targetUrl) {
     if (browser) await browser.close();
   }
 }
+
+// ... (rest of the server code)
+
 
 // Define the API endpoint for scraping
 app.post('/scrape', async (req, res) => {
